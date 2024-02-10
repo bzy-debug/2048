@@ -1,0 +1,19 @@
+.game {
+  font-size: 2rem;
+  font-family: monospace;
+  display: flex;
+  flex-direction: column;
+}
+
+.line {
+  display: flex;
+}
+
+.cube {
+  border: 2px solid black;
+  width: 4rem;
+  height: 4rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
