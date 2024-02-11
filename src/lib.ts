@@ -110,7 +110,16 @@ enum Action {
   Right,
 }
 
-function handleAction(state: State, action: Action): State {
+type AnimationInstruction = {
+  action: Action;
+  lineInstructions: number[][];
+};
+
+function handleAction(
+  state: State,
+  action: Action
+): [State, AnimationInstruction] {
+  const lineInstructions = [];
   let newState = structuredClone(state);
   const kind =
     action === Action.Left || action === Action.Right ? "row" : "col";
@@ -119,22 +128,48 @@ function handleAction(state: State, action: Action): State {
     const line = getLine(newState, kind, i);
     if (isReverse) line.reverse();
     const newLine = handleLine(line);
+    lineInstructions.push(lineAnimateInstructions(line, newLine));
     if (isReverse) newLine.reverse();
     newState = replaceLine(newState, newLine, kind, i);
   }
-  return newState;
-}
-
-function nextState(state: State, action: Action): State {
-  const afterMove = handleAction(state, action);
-  return stateIsEqual(state, afterMove) ? afterMove : generateNew(afterMove);
+  return [newState, { action, lineInstructions }];
 }
 
 function initState(): State {
   return generateNew(generateNew(emptyState));
 }
 
-export { initState, nextState, renderState, Action };
+export {
+  initState,
+  renderState,
+  handleAction,
+  generateNew,
+  stateIsEqual,
+  Action,
+  type AnimationInstruction,
+};
+
+function lineAnimateInstructions(before: Line, after: Line): number[] {
+  let i = 0;
+  let j = 0;
+  const instructions = [0, 0, 0, 0];
+  while (i < 4 && j < 4 && after[j] !== 0) {
+    while (before[i] === 0) i++;
+    if (after[j] === before[i]) {
+      if (j !== i) instructions[i] = i - j;
+      j++;
+      i++;
+    } else {
+      let k = i + 1;
+      while (k < 4 && before[k] === 0) k++;
+      instructions[i] = i - j;
+      instructions[k] = k - j;
+      i = k + 1;
+      j++;
+    }
+  }
+  return instructions;
+}
 
 if (import.meta.vitest) {
   const { it, expect } = import.meta.vitest;
@@ -153,7 +188,8 @@ if (import.meta.vitest) {
       [4, 0, 0, 4],
       [4, 2, 0, 4],
     ];
-    expect(renderState(handleAction(state, Action.Up))).toMatchInlineSnapshot(`
+    expect(renderState(handleAction(state, Action.Up)[0]))
+      .toMatchInlineSnapshot(`
       "<div class='game'>
       <div class='line'><div class='cube'>4</div><div class='cube'>4</div><div class='cube'>2</div><div class='cube'>2</div></div>
       <div class='line'><div class='cube'>8</div><div class='cube'></div><div class='cube'></div><div class='cube'>8</div></div>
@@ -161,7 +197,7 @@ if (import.meta.vitest) {
       <div class='line'><div class='cube'></div><div class='cube'></div><div class='cube'></div><div class='cube'></div></div>
       </div>"
     `);
-    expect(renderState(handleAction(state, Action.Down)))
+    expect(renderState(handleAction(state, Action.Down)[0]))
       .toMatchInlineSnapshot(`
         "<div class='game'>
         <div class='line'><div class='cube'></div><div class='cube'></div><div class='cube'></div><div class='cube'></div></div>
@@ -170,7 +206,7 @@ if (import.meta.vitest) {
         <div class='line'><div class='cube'>8</div><div class='cube'>4</div><div class='cube'>2</div><div class='cube'>8</div></div>
         </div>"
       `);
-    expect(renderState(handleAction(state, Action.Left)))
+    expect(renderState(handleAction(state, Action.Left)[0]))
       .toMatchInlineSnapshot(`
         "<div class='game'>
         <div class='line'><div class='cube'>4</div><div class='cube'>2</div><div class='cube'></div><div class='cube'></div></div>
@@ -179,7 +215,7 @@ if (import.meta.vitest) {
         <div class='line'><div class='cube'>4</div><div class='cube'>2</div><div class='cube'>4</div><div class='cube'></div></div>
         </div>"
       `);
-    expect(renderState(handleAction(state, Action.Right)))
+    expect(renderState(handleAction(state, Action.Right)[0]))
       .toMatchInlineSnapshot(`
         "<div class='game'>
         <div class='line'><div class='cube'></div><div class='cube'></div><div class='cube'>2</div><div class='cube'>4</div></div>
@@ -188,5 +224,19 @@ if (import.meta.vitest) {
         <div class='line'><div class='cube'></div><div class='cube'>4</div><div class='cube'>2</div><div class='cube'>4</div></div>
         </div>"
       `);
+  });
+  it("animation test", () => {
+    expect(
+      lineAnimateInstructions([2, 2, 4, 4], [4, 8, 0, 0]).join(" ")
+    ).toMatchInlineSnapshot(`"0 1 1 2"`);
+    expect(
+      lineAnimateInstructions([0, 0, 0, 2], [2, 0, 0, 0]).join(" ")
+    ).toMatchInlineSnapshot(`"0 0 0 3"`);
+    expect(
+      lineAnimateInstructions([4, 0, 0, 2], [4, 2, 0, 0]).join(" ")
+    ).toMatchInlineSnapshot(`"0 0 0 2"`);
+    expect(
+      lineAnimateInstructions([0, 0, 0, 0], [0, 0, 0, 0]).join(" ")
+    ).toMatchInlineSnapshot(`"0 0 0 0"`);
   });
 }
