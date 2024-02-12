@@ -12,16 +12,16 @@ function stateIsEqual(s1: State, s2: State): boolean {
 }
 
 function renderLine(line: Line): string {
-  let buf = `<div class='line'>`;
+  let buf = `<div class='game-row'>`;
   for (const i of line) {
-    buf += `<div class='cube'>${i === 0 ? "" : i}</div>`;
+    buf += `<div class='game-cell'>${i === 0 ? "" : i}</div>`;
   }
   buf += `</div>`;
   return buf;
 }
 
 function renderState(state: State): string {
-  return `<div class='game'>
+  return `<div class='game-container'>
 ${state.map(renderLine).join("\n")}
 </div>`;
 }
@@ -34,15 +34,15 @@ const emptyState: State = [
 ];
 const emptyLine = (): Line => [0, 0, 0, 0];
 
-function getLine(state: State, kind: "row" | "col", index: number): Line {
-  const line = emptyLine();
+function getLine<T>(grid: T[][], kind: "row" | "col", index: number): T[] {
+  const line: T[] = [];
   switch (kind) {
     case "col": {
-      for (let i = 0; i < 4; i++) line[i] = state[i][index];
+      for (let i = 0; i < 4; i++) line.push(grid[i][index]);
       break;
     }
     case "row": {
-      for (let i = 0; i < 4; i++) line[i] = state[index][i];
+      for (let i = 0; i < 4; i++) line.push(grid[index][i]);
       break;
     }
   }
@@ -110,29 +110,26 @@ enum Action {
   Right,
 }
 
-type AnimationInstruction = {
-  action: Action;
-  lineInstructions: number[][];
-};
+function lineKind(action: Action): "row" | "col" {
+  return action === Action.Left || action === Action.Right ? "row" : "col";
+}
 
-function handleAction(
-  state: State,
-  action: Action
-): [State, AnimationInstruction] {
-  const lineInstructions = [];
+function isReverse(action: Action): boolean {
+  return action === Action.Down || action === Action.Right;
+}
+
+function handleAction(state: State, action: Action): State {
   let newState = structuredClone(state);
-  const kind =
-    action === Action.Left || action === Action.Right ? "row" : "col";
-  const isReverse = action === Action.Down || action === Action.Right;
+  const kind = lineKind(action);
+  const reverse = isReverse(action);
   for (let i = 0; i < 4; i++) {
-    const line = getLine(newState, kind, i);
-    if (isReverse) line.reverse();
+    const line = getLine(newState, kind, i) as Line;
+    if (reverse) line.reverse();
     const newLine = handleLine(line);
-    lineInstructions.push(lineAnimateInstructions(line, newLine));
-    if (isReverse) newLine.reverse();
+    if (reverse) newLine.reverse();
     newState = replaceLine(newState, newLine, kind, i);
   }
-  return [newState, { action, lineInstructions }];
+  return newState;
 }
 
 function initState(): State {
@@ -145,11 +142,14 @@ export {
   handleAction,
   generateNew,
   stateIsEqual,
+  getLine,
+  lineKind,
+  lineAnimateInstructions,
+  isReverse,
   Action,
-  type AnimationInstruction,
 };
 
-function lineAnimateInstructions(before: Line, after: Line): number[] {
+function lineAnimateInstructions(before: number[], after: number[]): number[] {
   let i = 0;
   let j = 0;
   const instructions = [0, 0, 0, 0];
@@ -175,10 +175,10 @@ if (import.meta.vitest) {
   const { it, expect } = import.meta.vitest;
   it("handleLine test", () => {
     expect(renderLine(handleLine([2, 2, 2, 2]))).toMatchInlineSnapshot(
-      `"<div class='line'><div class='cube'>4</div><div class='cube'>4</div><div class='cube'></div><div class='cube'></div></div>"`
+      `"<div class='game-row'><div class='game-cell'>4</div><div class='game-cell'>4</div><div class='game-cell'></div><div class='game-cell'></div></div>"`
     );
     expect(renderLine(handleLine([2, 0, 0, 2]))).toMatchInlineSnapshot(
-      `"<div class='line'><div class='cube'>4</div><div class='cube'></div><div class='cube'></div><div class='cube'></div></div>"`
+      `"<div class='game-row'><div class='game-cell'>4</div><div class='game-cell'></div><div class='game-cell'></div><div class='game-cell'></div></div>"`
     );
   });
   it("action test", () => {
@@ -188,40 +188,39 @@ if (import.meta.vitest) {
       [4, 0, 0, 4],
       [4, 2, 0, 4],
     ];
-    expect(renderState(handleAction(state, Action.Up)[0]))
-      .toMatchInlineSnapshot(`
-      "<div class='game'>
-      <div class='line'><div class='cube'>4</div><div class='cube'>4</div><div class='cube'>2</div><div class='cube'>2</div></div>
-      <div class='line'><div class='cube'>8</div><div class='cube'></div><div class='cube'></div><div class='cube'>8</div></div>
-      <div class='line'><div class='cube'></div><div class='cube'></div><div class='cube'></div><div class='cube'></div></div>
-      <div class='line'><div class='cube'></div><div class='cube'></div><div class='cube'></div><div class='cube'></div></div>
+    expect(renderState(handleAction(state, Action.Up))).toMatchInlineSnapshot(`
+      "<div class='game-container'>
+      <div class='game-row'><div class='game-cell'>4</div><div class='game-cell'>4</div><div class='game-cell'>2</div><div class='game-cell'>2</div></div>
+      <div class='game-row'><div class='game-cell'>8</div><div class='game-cell'></div><div class='game-cell'></div><div class='game-cell'>8</div></div>
+      <div class='game-row'><div class='game-cell'></div><div class='game-cell'></div><div class='game-cell'></div><div class='game-cell'></div></div>
+      <div class='game-row'><div class='game-cell'></div><div class='game-cell'></div><div class='game-cell'></div><div class='game-cell'></div></div>
       </div>"
     `);
-    expect(renderState(handleAction(state, Action.Down)[0]))
+    expect(renderState(handleAction(state, Action.Down)))
       .toMatchInlineSnapshot(`
-        "<div class='game'>
-        <div class='line'><div class='cube'></div><div class='cube'></div><div class='cube'></div><div class='cube'></div></div>
-        <div class='line'><div class='cube'></div><div class='cube'></div><div class='cube'></div><div class='cube'></div></div>
-        <div class='line'><div class='cube'>4</div><div class='cube'></div><div class='cube'></div><div class='cube'>2</div></div>
-        <div class='line'><div class='cube'>8</div><div class='cube'>4</div><div class='cube'>2</div><div class='cube'>8</div></div>
+        "<div class='game-container'>
+        <div class='game-row'><div class='game-cell'></div><div class='game-cell'></div><div class='game-cell'></div><div class='game-cell'></div></div>
+        <div class='game-row'><div class='game-cell'></div><div class='game-cell'></div><div class='game-cell'></div><div class='game-cell'></div></div>
+        <div class='game-row'><div class='game-cell'>4</div><div class='game-cell'></div><div class='game-cell'></div><div class='game-cell'>2</div></div>
+        <div class='game-row'><div class='game-cell'>8</div><div class='game-cell'>4</div><div class='game-cell'>2</div><div class='game-cell'>8</div></div>
         </div>"
       `);
-    expect(renderState(handleAction(state, Action.Left)[0]))
+    expect(renderState(handleAction(state, Action.Left)))
       .toMatchInlineSnapshot(`
-        "<div class='game'>
-        <div class='line'><div class='cube'>4</div><div class='cube'>2</div><div class='cube'></div><div class='cube'></div></div>
-        <div class='line'><div class='cube'>4</div><div class='cube'></div><div class='cube'></div><div class='cube'></div></div>
-        <div class='line'><div class='cube'>8</div><div class='cube'></div><div class='cube'></div><div class='cube'></div></div>
-        <div class='line'><div class='cube'>4</div><div class='cube'>2</div><div class='cube'>4</div><div class='cube'></div></div>
+        "<div class='game-container'>
+        <div class='game-row'><div class='game-cell'>4</div><div class='game-cell'>2</div><div class='game-cell'></div><div class='game-cell'></div></div>
+        <div class='game-row'><div class='game-cell'>4</div><div class='game-cell'></div><div class='game-cell'></div><div class='game-cell'></div></div>
+        <div class='game-row'><div class='game-cell'>8</div><div class='game-cell'></div><div class='game-cell'></div><div class='game-cell'></div></div>
+        <div class='game-row'><div class='game-cell'>4</div><div class='game-cell'>2</div><div class='game-cell'>4</div><div class='game-cell'></div></div>
         </div>"
       `);
-    expect(renderState(handleAction(state, Action.Right)[0]))
+    expect(renderState(handleAction(state, Action.Right)))
       .toMatchInlineSnapshot(`
-        "<div class='game'>
-        <div class='line'><div class='cube'></div><div class='cube'></div><div class='cube'>2</div><div class='cube'>4</div></div>
-        <div class='line'><div class='cube'></div><div class='cube'></div><div class='cube'></div><div class='cube'>4</div></div>
-        <div class='line'><div class='cube'></div><div class='cube'></div><div class='cube'></div><div class='cube'>8</div></div>
-        <div class='line'><div class='cube'></div><div class='cube'>4</div><div class='cube'>2</div><div class='cube'>4</div></div>
+        "<div class='game-container'>
+        <div class='game-row'><div class='game-cell'></div><div class='game-cell'></div><div class='game-cell'>2</div><div class='game-cell'>4</div></div>
+        <div class='game-row'><div class='game-cell'></div><div class='game-cell'></div><div class='game-cell'></div><div class='game-cell'>4</div></div>
+        <div class='game-row'><div class='game-cell'></div><div class='game-cell'></div><div class='game-cell'></div><div class='game-cell'>8</div></div>
+        <div class='game-row'><div class='game-cell'></div><div class='game-cell'>4</div><div class='game-cell'>2</div><div class='game-cell'>4</div></div>
         </div>"
       `);
   });

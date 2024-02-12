@@ -1,15 +1,30 @@
-.game {
+.game-container {
   font-size: 2rem;
   font-family: monospace;
   display: flex;
   flex-direction: column;
+  gap: 1rem;
+  background-color: rgb(202, 193, 181);
+  background-image: repeating-linear-gradient(
+      rgb(185, 173, 161) 0 1rem,
+      transparent 1rem 5rem
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgb(185, 173, 161) 0 1rem,
+      transparent 1rem 5rem
+    );
+  padding: 1rem;
+  width: fit-content;
 }
 
-.line {
+.game-row {
   display: flex;
+  gap: 1rem;
 }
 
-.cube {
+.game-cell {
+  background-color: rgb(202, 193, 181);
   width: 4rem;
   height: 4rem;
   display: flex;
